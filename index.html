@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>File Encrypt/Decrypt</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<style>
+body { background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: Arial, sans-serif; }
+.container { background: #fff; padding: 40px; border-radius: 15px; box-shadow: 0 8px 25px rgba(0,0,0,0.2); width: 450px; text-align: center; }
+#dropArea { border: 2px dashed #6c757d; border-radius: 10px; height: 150px; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; cursor: pointer; background: #f8f9fa; }
+#dropArea.hover { background: #e2e6ea; }
+#fileName { margin-top: 10px; font-weight: bold; color: #495057; }
+.progress { height: 20px; margin-top: 15px; display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+<h2 class="mb-4">File Encryption / Decryption</h2>
+
+<div id="dropArea">Drag & Drop File Here or Click</div>
+<div id="fileName">No file selected</div>
+<input type="password" id="password" class="form-control mt-3" placeholder="Enter password">
+
+<div class="d-grid gap-2 mt-3">
+<button class="btn btn-primary" id="encryptBtn">Encrypt</button>
+<button class="btn btn-success" id="decryptBtn">Decrypt</button>
+</div>
+
+<div class="progress mt-3">
+  <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+</div>
+
+<p id="status" class="mt-2"></p>
+</div>
+
+<script>
+let selectedFile = null;
+const dropArea = document.getElementById('dropArea');
+const fileName = document.getElementById('fileName');
+const progress = document.querySelector('.progress');
+const progressBar = document.querySelector('.progress-bar');
+
+dropArea.addEventListener('click', () => {
+    let fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.onchange = e => {
+        selectedFile = e.target.files[0];
+        fileName.textContent = selectedFile.name;
+    };
+    fileInput.click();
+});
+
+dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.classList.add('hover'); });
+dropArea.addEventListener('dragleave', e => { e.preventDefault(); dropArea.classList.remove('hover'); });
+dropArea.addEventListener('drop', e => {
+    e.preventDefault();
+    dropArea.classList.remove('hover');
+    selectedFile = e.dataTransfer.files[0];
+    fileName.textContent = selectedFile.name;
+});
+
+async function uploadFile(endpoint) {
+    if (!selectedFile) return alert("Select a file first");
+    const password = document.getElementById('password').value;
+    if (!password) return alert("Enter password");
+
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("password", password);
+
+    progress.style.display = 'block';
+    progressBar.style.width = '0%';
+    document.getElementById('status').textContent = "Processing...";
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", endpoint, true);
+    xhr.responseType = 'blob';
+
+    xhr.upload.onprogress = e => {
+        if (e.lengthComputable) {
+            const percent = (e.loaded / e.total) * 100;
+            progressBar.style.width = percent + "%";
+        }
+    };
+
+    xhr.onload = () => {
+        if (xhr.status === 200) {
+            const blob = xhr.response;
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+
+            // Set download name
+            let name = selectedFile.name;
+            if(endpoint === '/encrypt') name += ".enc";
+            link.download = name;
+            link.click();
+            progressBar.style.width = "100%";
+            document.getElementById('status').textContent = "Done!";
+        } else {
+            document.getElementById('status').textContent = "Error: " + xhr.statusText;
+        }
+        setTimeout(() => { progress.style.display = 'none'; }, 1000);
+    };
+
+    xhr.send(formData);
+}
+
+document.getElementById('encryptBtn').onclick = () => uploadFile('/encrypt');
+document.getElementById('decryptBtn').onclick = () => uploadFile('/decrypt');
+</script>
+</body>
+</html>
